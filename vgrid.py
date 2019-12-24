@@ -43,19 +43,19 @@ class vgrid():
     def mean(self,x,y,z,w,idx,jdx,dataindices):
         '''Mean gridding algorithm.
 
-	   vgrid implemnets incremental gridding where possible. 
-	   To do this, the sum of the product of the weights and z values are retained
-           in addition to the sum of the weights. Then method zz() calculates the 
-           quotient of the two to obtain the actual weighted mean z values. Note that
-           when all weights are one, (or if w is set to 1 for shorthand), a standard
-           mean is calculated.
+	    vgrid implemnets incremental gridding where possible. 
+	    To do this, the sum of the product of the weights and z values are retained
+        in addition to the sum of the weights. Then method zz() calculates the 
+        quotient of the two to obtain the actual weighted mean z values. Note that
+        when all weights are one, (or if w is set to 1 for shorthand), a standard
+        mean is calculated.
 
-           Variance is calcualted in a similar way. In this case the sum of w*(z_i - mu)^2
-           is calculated and stored for each grid node, where z_i is the value to be gridded
-           and mu is the mean of the grid node calculated thus far.  Then this sum 
-           is divided by the sum of the weights to get the final estimated variance. As the
-           mean of the grid node approaches the true mean, this value should approach the 
-           true variance. 
+        Variance is calcualted in a similar way. In this case the sum of w*(z_i - mu)^2
+        is calculated and stored for each grid node, where z_i is the value to be gridded
+        and mu is the mean of the grid node calculated thus far.  Then this sum 
+        is divided by the sum of the weights to get the final estimated variance. As the
+        mean of the grid node approaches the true mean, this value should approach the 
+        true variance. 
         '''
 
         if w.size == 1:
@@ -68,11 +68,19 @@ class vgrid():
             self.varw[idx, jdx] = np.nansum(np.concatenate((np.power( (z[dataindices] - self.zw[idx,jdx]/self.nn[idx,jdx]), 2),[self.varw[idx, jdx]])))
         else:
             # Weighted gridding. Sum of value times the weight divided by the sum of the weights.
+            # The strategy taken here is to retain the sum of the values times the weights, and also
+            # the sum of the weights. Then when the weighted mean is requested the calling function 
+            # divides the these two values. This strategy allows incremental addition of data to the grid.
+            #
+            # The coding strategy below is to append the new points to the existing point in a list
+            # and then call nansum to add them up. 
+            #
             # Q: Note: A dot-product might be quicker, but there is no dot-product that will produce a
             # non-nan result if one of the values is nan, which is desired here.
             self.zw[idx, jdx] = np.nansum(np.append(self.zw[idx, jdx], z[dataindices] * w[dataindices]))
             self.ww[idx, jdx] = np.nansum(np.append(self.ww[idx, jdx], w[dataindices]))
-            self.varw[idx, jdx] = np.nansum(np.append(np.power( (z[dataindices] - self.zw[idx,jdx]/self.ww[idx,jdx]),2), self.varw[idx, jdx] ))
+            self.varw[idx, jdx] = np.nansum(np.append(np.power( (z[dataindices] - self.zw[idx,jdx]/self.ww[idx,jdx]),2)
+                                                      , self.varw[idx, jdx] ))
 
     def var(self):
         ''' Calculate the variance'''
@@ -281,6 +289,10 @@ class vgrid():
 
         cinf2 = self.cinf**2
 
+        # Trial with k-d tree.
+        #tree = spatial.KDTree((zip(x.ravel(),y.ravel()))
+        #tree.query(zip(self.xx.ravel(),self.yy.ravel()),p=2,distance_upper_bound=self.cinf)
+
         # Go through the rows of the grid..
         for idx in range(grows):
             '''
@@ -298,10 +310,13 @@ class vgrid():
             % This will never be true when either term of the lhs is >= cinf^2. So
             % we reduce the search by doing these piece-meal. '''
 
+
+
             # Here we find the y data values within cinf of the grid node
             ddy = (y - self.yy[idx])**2
             #yidx = np.flatnonzero(ddy < cinf2)
             yidx = np.flatnonzero(ddy < cinf2)
+            #yidx = ddy < cinf2
 
             # If there are none, then don't bother with further calculations.
             if yidx.size == 0:
