@@ -94,8 +94,18 @@ class vgrid():
         ''' TO DO: Calculate the mean, rejecting values that exceed 3-sigma from existing estimate.'''
         pass
 
-    def median(self):
-        ''' TO DO: Calculate the median value in each grid cell. '''
+    def median(self,x,y,z,w,idx,jdx,dataindices):
+        ''' Calculate the median value in each grid cell. 
+        
+        The method used here to provide a "running median" is for each add(), 
+        calculate the average of the existing value with the median of the 
+        new points. This method works reasonably well, but can produce inferior 
+        results if a single add() contains only outliers and their are insufficent
+        additional adds to constrain it.'''
+        self.zw[idx, jdx] = np.nanmean(np.append(self.zw[idx, jdx], np.nanmedian(z[dataindices])))
+        self.ww[idx,jdx] = 1
+        self.varw[idx, jdx] = np.nansum(np.append(np.power( (z[dataindices] - self.zw[idx,jdx]/self.ww[idx,jdx]),2)
+                                                  , self.varw[idx, jdx] ))
         pass
 
     def gridsizesanitycheck(self,M):
@@ -347,6 +357,9 @@ class vgrid():
 
                 if self.type == 'mean':
                     self.mean(x,y,z,w,idx,jdx,yidx[xidx])
+                    
+                if self.type == "median":
+                    self.median(x,y,z,w,idx,jdx,yidx[xidx])
 
 
 
