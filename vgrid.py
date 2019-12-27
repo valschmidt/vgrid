@@ -16,11 +16,11 @@ import sys
 
 class vgrid():
     ''' A class for gridding of x,y,z data.
-
-	See vgrid.add() for details on usage.
+    
+    See vgrid.add() for details on usage.
     '''
 
-    def __init__(self,cs = 1.0, cinf = 1.0, type = 'mean'):
+    def __init__(self, cs=1.0, cinf=1.0, type='mean'):
 
         self.cs = cs        # cell size
         self.cinf = cinf    # cell influence
@@ -35,12 +35,23 @@ class vgrid():
         self.varw = None          # Sum of the square of the difference of the gridded values and the estimated mean, times their weights.
         self.Z = None            # Sequential estimator of depth for scalar (CUBE) or platlet methods.
         self.CZ = None
+        
+        ### Utility variables used internally. ###
+        # New values to incorporate into grid.
+        self._x = None
+        self._y = None
+        self._z = None
+        self._w = None
+        self._II = None      # Indices of values to add for node under consideration.
+        # (These are not used as class variables currently.)
+        self._idx = None     # row grid node indiex for node under consideration.
+        self._jdx = None     # column grid node indiex for node under consideation.
 
     def zz(self):
         ''' Calculate the z values for the grid.'''
         return self.zw / self.ww
 
-    def mean(self,x,y,z,w,idx,jdx,dataindices):
+    def mean(self,idx,jdx):
         '''Mean gridding algorithm.
 
 	    vgrid implemnets incremental gridding where possible. 
@@ -58,16 +69,14 @@ class vgrid():
         true variance. 
         '''
 
-        if w.size == 1:
-            #tmp = np.empty(dataindices.size + 1)
-            #tmp[0:dataindices.size] = z[dataindices]
-            #tmp[-1] = self.zw[idx,jdx]
-            #self.zw[idx, jdx] = np.nansum(tmp)
-            self.zw[idx, jdx] = np.nansum(np.concatenate((z[dataindices], [self.zw[idx, jdx]])))
+        # Non-weighted gridding.
+        if self._w.size == 1:
+            self.zw[idx, jdx] = np.nansum(np.concatenate((self._z[self._II], [self.zw[idx, jdx]])))
             self.ww[idx, jdx] = self.nn[idx, jdx]
-            self.varw[idx, jdx] = np.nansum(np.concatenate((np.power( (z[dataindices] - self.zw[idx,jdx]/self.nn[idx,jdx]), 2),[self.varw[idx, jdx]])))
+            self.varw[idx, jdx] = np.nansum(np.concatenate((np.power( (self._z[self._II] - self.zw[idx,jdx]/self.nn[idx,jdx]), 2),[self.varw[idx, jdx]])))
         else:
-            # Weighted gridding. Sum of value times the weight divided by the sum of the weights.
+            # Weighted gridding. Sum of value times the weight divided by the 
+            # sum of the weights.
             # The strategy taken here is to retain the sum of the values times the weights, and also
             # the sum of the weights. Then when the weighted mean is requested the calling function 
             # divides the these two values. This strategy allows incremental addition of data to the grid.
@@ -77,9 +86,9 @@ class vgrid():
             #
             # Q: Note: A dot-product might be quicker, but there is no dot-product that will produce a
             # non-nan result if one of the values is nan, which is desired here.
-            self.zw[idx, jdx] = np.nansum(np.append(self.zw[idx, jdx], z[dataindices] * w[dataindices]))
-            self.ww[idx, jdx] = np.nansum(np.append(self.ww[idx, jdx], w[dataindices]))
-            self.varw[idx, jdx] = np.nansum(np.append(np.power( (z[dataindices] - self.zw[idx,jdx]/self.ww[idx,jdx]),2)
+            self.zw[idx, jdx] = np.nansum(np.append(self.zw[idx, jdx], self._z[self._II] * self._w[self._II]))
+            self.ww[idx, jdx] = np.nansum(np.append(self.ww[idx, jdx], self._w[self._II]))
+            self.varw[idx, jdx] = np.nansum(np.append(np.power( (self._z[self._II] - self.zw[idx,jdx]/self.ww[idx,jdx]),2)
                                                       , self.varw[idx, jdx] ))
 
     def var(self):
@@ -91,31 +100,35 @@ class vgrid():
         return np.sqrt(self.var())
 
     def meanwithoutlierrejection(self):
-        ''' TO DO: Calculate the mean, rejecting values that exceed 3-sigma from existing estimate.'''
+        ''' TO DO: Calculate the mean, rejecting values that exceed 3-sigma
+        from existing estimate.'''
         pass
 
-    def median(self,x,y,z,w,idx,jdx,dataindices):
-        ''' Calculate the median value in each grid cell. 
+    def median(self, idx, jdx):
+        ''' Calculate the median value in each grid cell.
         
-        The method used here to provide a "running median" is for each add(), 
-        calculate the average of the existing value with the median of the 
-        new points. This method works reasonably well, but can produce inferior 
-        results if a single add() contains only outliers and their are insufficent
-        additional adds to constrain it.'''
-        self.zw[idx, jdx] = np.nanmean(np.append(self.zw[idx, jdx], np.nanmedian(z[dataindices])))
-        self.ww[idx,jdx] = 1
-        self.varw[idx, jdx] = np.nansum(np.append(np.power( (z[dataindices] - self.zw[idx,jdx]/self.ww[idx,jdx]),2)
-                                                  , self.varw[idx, jdx] ))
+        The method used here to provide a "running median" is for each add(),
+        calculate the average of the existing value with the median of the
+        new points. This method works reasonably well, but can produce
+        inferior results if a single add() contains only outliers and their
+        are insufficient additional adds to constrain it.'''
+        self.zw[idx, jdx] = np.nanmean(
+            np.append(self.zw[idx, jdx], np.nanmedian(self._z[self._II])))
+        self.ww[idx, jdx] = 1
+        self.varw[idx, jdx] = np.nansum(np.append(
+            np.power((self._z[self._II] - self.zw[idx, jdx]/self.ww[idx, jdx]),
+                     2),
+            self.varw[idx, jdx]))
         pass
 
-    def gridsizesanitycheck(self,M):
-        '''Check to see if the grid size is going to be REALLY large. False = Insane!'''
+    def gridsizesanitycheck(self, M):
+        '''Check to see if the grid size is going to be REALLY large. '''
         if M.__len__() > 1e4:
             return False
         else:
             return True
 
-    def add(self,x,y,z,w):
+    def add(self, x, y, z, w):
         ''' An incremental gridding function
 
         Arguments:
@@ -140,8 +153,8 @@ class vgrid():
         % Grid types:
         % mean:
         %   Average of the values. When w != 1, the mean is calculated by
-        %   multipying each value in the cell by its weight divided by the sum of
-        %   the weights in that cell.
+        %   multipying each value in the cell by its weight divided by the sum
+        %   of the weights in that cell.
         %
         % median:
         %   Calculates the median value for each grid cell.
@@ -199,38 +212,40 @@ class vgrid():
             print('X, Y, or Z is scalar - must be numpy array.')
             sys.exit()
 
-        x = x.ravel()
-        y = y.ravel()
-        z = z.ravel()
+        self._x = x.ravel()
+        self._y = y.ravel()
+        self._z = z.ravel()
+        
         if not np.isscalar(w):
-            w = w.ravel()
+            self._w = w.ravel()
         else:
-            w = np.array(w)
+            self._w = np.array(w)
 
         # Weight cannot be zero.
-        if w.size != 1:
-            if sum(w == 0):
+        if self._w.size != 1:
+            if sum(self._w == 0):
                 print('Found zero weights. Weights cannot be zero. Setting to 1e-20')
-                w[ w==0 ] = 1e-20
+                self._w[self._w == 0] = 1e-20
 
         # Set up new grid.
         if self.zw is None:
             newgrid = 1
             # Set coordiantes for grid cells
-            self.xx = np.arange(min(x),max(x)+self.cs,self.cs)
-            self.yy = np.arange(min(y),max(y)+self.cs,self.cs)
+            self.xx = np.arange(min(self._x), max(self._x)+self.cs, self.cs)
+            self.yy = np.arange(min(self._y), max(self._y)+self.cs, self.cs)
 
-            if not (self.gridsizesanitycheck(self.xx) and self.gridsizesanitycheck(self.yy)):
+            if not (self.gridsizesanitycheck(self.xx) and 
+                    self.gridsizesanitycheck(self.yy)):
                 print('Grid size is too large.')
                 return
 
         else:
 
             # Extend the existing grid.
-            minx = min(x)
-            miny = min(y)
-            maxx = max(x)
-            maxy = max(y)
+            minx = min(self._x)
+            miny = min(self._y)
+            maxx = max(self._x)
+            maxy = max(self._y)
 
             if minx < self.xx[0]:
                 dx = np.arange(minx, self.xx[0] - self.cs, self.cs)
@@ -323,7 +338,7 @@ class vgrid():
 
 
             # Here we find the y data values within cinf of the grid node
-            ddy = (y - self.yy[idx])**2
+            ddy = (self._y - self.yy[idx])**2
             #yidx = np.flatnonzero(ddy < cinf2)
             yidx = np.flatnonzero(ddy < cinf2)
             #yidx = ddy < cinf2
@@ -336,16 +351,19 @@ class vgrid():
             # But first pre-calculate a vector of terms that will be needed for every evaluation.
             xtest = cinf2 - ddy[yidx]
             for jdx in range(gcols):
-                xidx = np.flatnonzero( (x[yidx] - self.xx[jdx])**2 < xtest )
+                xidx = np.flatnonzero( (self._x[yidx] - self.xx[jdx])**2 < xtest )
 
                 # If there are none of these then there is nothing to do to the grid node.
                 if xidx.size == 0:
                     continue
+                
+                # Set the indices of the values to be add to this grid node.
+                self._II = yidx[xidx]
 
                 if self.type == 'dwm':
                     # Calculate distance between points and grid node for distance-weighted mean.
                     # In the case, w is the exponent.
-                    R = ((self.xx[jdx] - x(yidx[xidx]))**2 + ( self.yy[jdx]-y[yidx[xidx]])**2)**(self.w/2.0)
+                    R = ((self.xx[jdx] - self._x(self.II))**2 + ( self.yy[jdx]-self._y[self.II])**2)**(self._w/2.0)
 
                 if not doindices:
                     self.nn[idx,jdx] = np.nansum(np.append(self.nn[idx,jdx], xidx.size))
@@ -356,10 +374,10 @@ class vgrid():
                 #print('VALUES: %s' % ','.join(map(str,z[yidx[xidx]])))
 
                 if self.type == 'mean':
-                    self.mean(x,y,z,w,idx,jdx,yidx[xidx])
+                    self.mean(idx,jdx)
                     
                 if self.type == "median":
-                    self.median(x,y,z,w,idx,jdx,yidx[xidx])
+                    self.median(idx,jdx)
 
 
 
