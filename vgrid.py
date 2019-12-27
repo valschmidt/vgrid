@@ -46,10 +46,23 @@ class vgrid():
         # (These are not used as class variables currently.)
         self._idx = None     # row grid node indiex for node under consideration.
         self._jdx = None     # column grid node indiex for node under consideation.
+        self._I = None       # table of index lists for data to add for each grid node
 
     def zz(self):
         ''' Calculate the z values for the grid.'''
         return self.zw / self.ww
+    
+    def mean_wholegrid(self):
+        ''' Calculate mean values for the whole grid.'''
+        # Fancy list comprehension to execute a double loop concisely.
+        [self.mean(idx, jdx) for idx in range(self.yy.size)
+         for jdx in range(self.xx.size)]
+
+    def median_wholegrid(self):
+        ''' Calculate median values for the whole grid.'''
+        # Fancy list comprehension to execute a double loop concisely.
+        [self.median(idx, jdx) for idx in range(self.yy.size)
+         for jdx in range(self.xx.size)]
 
     def mean(self,idx,jdx):
         '''Mean gridding algorithm.
@@ -68,7 +81,9 @@ class vgrid():
         mean of the grid node approaches the true mean, this value should approach the 
         true variance. 
         '''
-
+        
+        self._II = self._I[idx][jdx]
+        
         # Non-weighted gridding.
         if self._w.size == 1:
             self.zw[idx, jdx] = np.nansum(np.concatenate((self._z[self._II], [self.zw[idx, jdx]])))
@@ -198,7 +213,6 @@ class vgrid():
             self.ww = np.concatenate((self.ww,np.copy(tmp)), axis=1)
             self.varw = np.concatenate((self.varw,np.copy(tmp)), axis=1)
 
-
     def add(self, x, y, z, w):
         ''' An incremental gridding function
 
@@ -308,10 +322,35 @@ class vgrid():
 
         doindices = 0
 
+        self.sort_data()
+ 
+        # Peform the gridding calculations.        
+        if self.type == 'dwm':
+            # Calculate distance between points and grid node for distance-weighted mean.
+            # In the case, w is the exponent.
+            #R = ((self.xx[jdx] - self._x(self.II))**2 +
+            #     (self.yy[jdx]-self._y[self.II])**2)**(self._w/2.0)
+            print("Not yet supported.")
+
+        if self.type == 'mean':
+            self.mean_wholegrid()
+
+        if self.type == "median":
+            self.median_wholegrid()
+
+    def sort_data(self):
+        ''' Determine which data contributes to each grid node.
+        The list of indices is populated in self._I[n][m], where n and m
+        indicate the grid node.'''
+
+        # Initilize the 2D list of index lists.
+        self._I = [x[:] for x in
+                   [[None] * self.xx.size] * self.yy.size]
+
         cinf2 = self.cinf**2
 
         # Go through the rows of the grid..
-        for idx in range(grows):
+        for idx in np.arange(0,self.yy.size, dtype='uint32'):
             '''
             We need to search through all the data efficiently to determine
             indices for points that will contribute to a grid node. Those that
@@ -327,55 +366,36 @@ class vgrid():
             This will never be true when either term of the lhs is >= cinf^2.
             So we reduce the search by doing these piece-meal. '''
 
-
-
             # Here we find the y data values within cinf of the grid node
             ddy = (self._y - self.yy[idx])**2
-            #yidx = np.flatnonzero(ddy < cinf2)
             yidx = np.flatnonzero(ddy < cinf2)
-            #yidx = ddy < cinf2
 
             # If there are none, then don't bother with further calculations.
             if yidx.size == 0:
                 continue
 
-            # Then go through each cell of that row, and look for x - values that also are in the cell.
-            # But first pre-calculate a vector of terms that will be needed for every evaluation.
+            # Then go through each cell of that row, and look for x - values
+            # that also are in the cell. But first pre-calculate a vector of
+            # terms that will be needed for every evaluation.
             xtest = cinf2 - ddy[yidx]
-            for jdx in range(gcols):
-                xidx = np.flatnonzero( (self._x[yidx] - self.xx[jdx])**2 < xtest )
-
-                # If there are none of these then there is nothing to do to the grid node.
+            for jdx in np.arange(0, self.xx.size, dtype='uint32'):
+                xidx = np.flatnonzero((self._x[yidx] - self.xx[jdx])**2
+                                      < xtest)
+                # If there are none of these then there is nothing to do.
                 if xidx.size == 0:
                     continue
-                
-                # Set the indices of the values to be add to this grid node.
-                self._II = yidx[xidx]
 
-                if self.type == 'dwm':
-                    # Calculate distance between points and grid node for distance-weighted mean.
-                    # In the case, w is the exponent.
-                    R = ((self.xx[jdx] - self._x(self.II))**2 +
-                         (self.yy[jdx]-self._y[self.II])**2)**(self._w/2.0)
+                # Retain the list of indices contributing to the node.
+                self._I[idx][jdx] = yidx[xidx]
 
-                if not doindices:
-                    self.nn[idx,jdx] = np.nansum(np.append(self.nn[idx,jdx], xidx.size))
-                else:
-                    self.nn[idx,jdx] = idx*(gcols-1) + jdx
-
-                #print('INDEXES: %s' % ','.join(map(str,yidx[xidx])))
-                #print('VALUES: %s' % ','.join(map(str,z[yidx[xidx]])))
-
-                if self.type == 'mean':
-                    self.mean(idx,jdx)
-                    
-                if self.type == "median":
-                    self.median(idx,jdx)
+                # Keep  running count of the number of values.
+                self.nn[idx,jdx] = np.nansum(np.append(self.nn[idx, jdx], 
+                                                       xidx.size))
+ 
 
 
-
-        def rotate(self):
-            pass
+    def rotate(self):
+        pass
 
     def pcolor(self,*kwargs):
 
