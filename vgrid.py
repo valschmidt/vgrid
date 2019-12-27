@@ -127,6 +127,77 @@ class vgrid():
             return False
         else:
             return True
+        
+    def create_new_grid(self):
+        ''' Create a new empty grid.'''
+        
+        self.xx = np.arange(min(self._x), max(self._x)+self.cs, self.cs)
+        self.yy = np.arange(min(self._y), max(self._y)+self.cs, self.cs)
+
+        if not (self.gridsizesanitycheck(self.xx) and
+                self.gridsizesanitycheck(self.yy)):
+            print('Grid size is too large.')
+            return
+        
+        # Initialize grid.
+        self.zw = np.empty((self.yy.size, self.xx.size))
+        self.zw.fill(np.nan)
+        self.nn = np.copy(self.zw)
+        self.ww = np.copy(self.zw)
+        self.varw = np.copy(self.zw)
+        
+    def expand_grid(self):
+        minx = min(self._x)
+        miny = min(self._y)
+        maxx = max(self._x)
+        maxy = max(self._y)
+
+        if minx < self.xx[0]:
+            dx = np.arange(minx, self.xx[0] - self.cs, self.cs)
+            self.xx = np.concatenate((dx,self.xx))
+            # Create new space
+            tmp = np.empty((self.yy.size,dx.size))
+            tmp.fill(np.nan)
+            # Tack it on.
+            self.zw = np.concatenate((np.copy(tmp), self.zw), axis=0)
+            self.nn = np.concatenate((np.copy(tmp), self.nn), axis=0)
+            self.ww = np.concatenate((np.copy(tmp), self.ww), axis=0)
+            self.varw = np.concatenate((np.copy(tmp), self.varw), axis=0)
+
+        # FIX: Support depth/platelet estimates here, tbd
+
+        if maxx > self.xx[-1]:
+            dx = np.arange(self.xx[-1]+self.cs,maxx,self.cs)
+            self.xx = np.concatenate((self.xx,dx))
+            # Create new space
+            tmp = np.empty((self.yy.size,dx.size))
+            tmp.fill(np.nan)
+            # Tack it on.
+            self.zw = np.concatenate((self.zw,np.copy(tmp)),axis=1)
+            self.nn = np.concatenate((self.nn,np.copy(tmp)),axis=1)
+            self.ww = np.concatenate((self.ww,np.copy(tmp)),axis=1)
+            self.varw = np.concatenate((self.varw,np.copy(tmp)),axis=1)
+
+        if miny < self.yy[0]:
+            dy = np.arange(miny,self.yy[0]-self.cs,self.cs)
+            self.yy = np.concatenate((dy,self.yy))
+            tmp = np.empty((dy.size,self.xx.size))
+            tmp.fill(np.nan)
+            self.zw = np.concatenate((np.copy(tmp), self.zw),axis=0)
+            self.nn = np.concatenate((np.copy(tmp), self.nn),axis=0)
+            self.ww = np.concatenate((np.copy(tmp), self.ww),axis=0)
+            self.varw = np.concatenate((np.copy(tmp), self.varw),axis=0)
+
+        if maxy > self.yy[-1]:
+            dy = np.arange(self.yy[-1]+self.cs,maxy,self.cs)
+            self.yy = np.concatenate((self.yy,dy))
+            tmp = np.empty((dy.size,self.xx.size))
+            tmp.fill(np.nan)
+            self.zw = np.concatenate((self.zw,np.copy(tmp)), axis=1)
+            self.nn = np.concatenate((self.nn,np.copy(tmp)), axis=1)
+            self.ww = np.concatenate((self.ww,np.copy(tmp)), axis=1)
+            self.varw = np.concatenate((self.varw,np.copy(tmp)), axis=1)
+
 
     def add(self, x, y, z, w):
         ''' An incremental gridding function
@@ -205,8 +276,6 @@ class vgrid():
         % 2018, 2019
         '''
 
-        newgrid = 0
-
         # Force everything to match.
         if np.isscalar(x) or np.isscalar(y) or np.isscalar(z):
             print('X, Y, or Z is scalar - must be numpy array.')
@@ -215,7 +284,6 @@ class vgrid():
         self._x = x.ravel()
         self._y = y.ravel()
         self._z = z.ravel()
-        
         if not np.isscalar(w):
             self._w = w.ravel()
         else:
@@ -224,116 +292,40 @@ class vgrid():
         # Weight cannot be zero.
         if self._w.size != 1:
             if sum(self._w == 0):
-                print('Found zero weights. Weights cannot be zero. Setting to 1e-20')
+                print("Found zero weights. Weights cannot be zero.")
+                print("Setting to 1e-20.")
                 self._w[self._w == 0] = 1e-20
 
-        # Set up new grid.
+        # Set up new grid, or extend the existing grid if necessary.
         if self.zw is None:
-            newgrid = 1
-            # Set coordiantes for grid cells
-            self.xx = np.arange(min(self._x), max(self._x)+self.cs, self.cs)
-            self.yy = np.arange(min(self._y), max(self._y)+self.cs, self.cs)
-
-            if not (self.gridsizesanitycheck(self.xx) and 
-                    self.gridsizesanitycheck(self.yy)):
-                print('Grid size is too large.')
-                return
+            self.create_new_grid()
 
         else:
-
-            # Extend the existing grid.
-            minx = min(self._x)
-            miny = min(self._y)
-            maxx = max(self._x)
-            maxy = max(self._y)
-
-            if minx < self.xx[0]:
-                dx = np.arange(minx, self.xx[0] - self.cs, self.cs)
-                self.xx = np.concatenate((dx,self.xx))
-                # Create new space
-                tmp = np.empty((self.yy.size,dx.size))
-                tmp.fill(np.nan)
-                # Tack it on.
-                self.zw = np.concatenate((np.copy(tmp), self.zw), axis=0)
-                self.nn = np.concatenate((np.copy(tmp), self.nn), axis=0)
-                self.ww = np.concatenate((np.copy(tmp), self.ww), axis=0)
-                self.varw = np.concatenate((np.copy(tmp), self.varw), axis=0)
-
-                # FIX: Support depth/platelet estimates here, tbd
-
-            if maxx > self.xx[-1]:
-                dx = np.arange(self.xx[-1]+self.cs,maxx,self.cs)
-                self.xx = np.concatenate((self.xx,dx))
-                # Create new space
-                tmp = np.empty((self.yy.size,dx.size))
-                tmp.fill(np.nan)
-                # Tack it on.
-                self.zw = np.concatenate((self.zw,np.copy(tmp)),axis=1)
-                self.nn = np.concatenate((self.nn,np.copy(tmp)),axis=1)
-                self.ww = np.concatenate((self.ww,np.copy(tmp)),axis=1)
-                self.varw = np.concatenate((self.varw,np.copy(tmp)),axis=1)
-
-            if miny < self.yy[0]:
-                dy = np.arange(miny,self.yy[0]-self.cs,self.cs)
-                self.yy = np.concatenate((dy,self.yy))
-                tmp = np.empty((dy.size,self.xx.size))
-                tmp.fill(np.nan)
-                self.zw = np.concatenate((np.copy(tmp), self.zw),axis=0)
-                self.nn = np.concatenate((np.copy(tmp), self.nn),axis=0)
-                self.ww = np.concatenate((np.copy(tmp), self.ww),axis=0)
-                self.varw = np.concatenate((np.copy(tmp), self.varw),axis=0)
-
-            if maxy > self.yy[-1]:
-                dy = np.arange(y[-1]+self.cs,maxy,self.cs)
-                self.yy = np.concatenate((self.yy,dy))
-                tmp = np.empty((dy.size,self.xx.size))
-                tmp.fill(np.nan)
-                self.zw = np.concatenate((self.zw,np.copy(tmp)), axis=1)
-                self.nn = np.concatenate((self.nn,np.copy(tmp)), axis=1)
-                self.ww = np.concatenate((self.ww,np.copy(tmp)), axis=1)
-                self.varw = np.concatenate((self.varw,np.copy(tmp)), axis=1)
-
-        # Get boundaries of the grid cells.
-        xxlb = self.xx - self.cinf
-        xxup = self.xx + self.cinf
-        yylb = self.yy - self.cinf
-        yyup = self.yy + self.cinf
+            self.expand_grid()
 
         grows = self.yy.size
         gcols = self.xx.size
 
         doindices = 0
 
-        if newgrid:
-            tmp = np.empty((grows,gcols))
-            tmp.fill(np.nan)
-            self.zw = tmp
-            self.nn = np.copy(tmp)
-            self.ww = np.copy(tmp)
-            self.varw = np.copy(tmp)
-
         cinf2 = self.cinf**2
-
-        # Trial with k-d tree.
-        #tree = spatial.KDTree((zip(x.ravel(),y.ravel()))
-        #tree.query(zip(self.xx.ravel(),self.yy.ravel()),p=2,distance_upper_bound=self.cinf)
 
         # Go through the rows of the grid..
         for idx in range(grows):
             '''
-            % We need to search through all the data efficiently to determine
-            % indices for points that will contribute to a grid node. Those that
-            % contribute are ones that fall within the "cell influence" (cinf).
-            % Thse are the ones that meet the criteria:
-            %
-            % sqrt( (x-xo).^2 + (y-yo).^2 ) < cinf
-            %
-            % Squaring both sides....
-            %
-            % (x-xo)^2 + (y-yo)^2 < cinf^2
-            %
-            % This will never be true when either term of the lhs is >= cinf^2. So
-            % we reduce the search by doing these piece-meal. '''
+            We need to search through all the data efficiently to determine
+            indices for points that will contribute to a grid node. Those that
+            contribute are ones that fall within the "cell influence" (cinf).
+            Thse are the ones that meet the criteria:
+
+            sqrt( (x-xo).^2 + (y-yo).^2 ) < cinf
+
+            Squaring both sides....
+
+            (x-xo)^2 + (y-yo)^2 < cinf^2
+
+            This will never be true when either term of the lhs is >= cinf^2.
+            So we reduce the search by doing these piece-meal. '''
 
 
 
@@ -363,12 +355,13 @@ class vgrid():
                 if self.type == 'dwm':
                     # Calculate distance between points and grid node for distance-weighted mean.
                     # In the case, w is the exponent.
-                    R = ((self.xx[jdx] - self._x(self.II))**2 + ( self.yy[jdx]-self._y[self.II])**2)**(self._w/2.0)
+                    R = ((self.xx[jdx] - self._x(self.II))**2 +
+                         (self.yy[jdx]-self._y[self.II])**2)**(self._w/2.0)
 
                 if not doindices:
                     self.nn[idx,jdx] = np.nansum(np.append(self.nn[idx,jdx], xidx.size))
                 else:
-                    self.nn[idx,jdx] = idx*(cols-1) + jdx
+                    self.nn[idx,jdx] = idx*(gcols-1) + jdx
 
                 #print('INDEXES: %s' % ','.join(map(str,yidx[xidx])))
                 #print('VALUES: %s' % ','.join(map(str,z[yidx[xidx]])))
