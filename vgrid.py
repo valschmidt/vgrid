@@ -51,39 +51,44 @@ class vgrid():
     def zz(self):
         ''' Calculate the z values for the grid.'''
         return self.zw / self.ww
-    
+
     def mean_wholegrid(self):
         ''' Calculate mean values for the whole grid.'''
         # Fancy list comprehension to execute a double loop concisely.
-        [self.mean(idx, jdx) for idx in range(self.yy.size)
-         for jdx in range(self.xx.size)]
+        [self.mean(idx, jdx)
+         for idx in range(self.yy.size)
+         for jdx in range(self.xx.size)
+         if self._I[idx][jdx] is not None]
 
     def median_wholegrid(self):
         ''' Calculate median values for the whole grid.'''
         # Fancy list comprehension to execute a double loop concisely.
-        [self.median(idx, jdx) for idx in range(self.yy.size)
-         for jdx in range(self.xx.size)]
+        [self.median(idx, jdx)
+         for idx in range(self.yy.size)
+         for jdx in range(self.xx.size)
+         if self._I[idx][jdx] is not None]
 
-    def mean(self,idx,jdx):
+    def mean(self, idx, jdx):
         '''Mean gridding algorithm.
 
-	    vgrid implemnets incremental gridding where possible. 
-	    To do this, the sum of the product of the weights and z values are retained
-        in addition to the sum of the weights. Then method zz() calculates the 
-        quotient of the two to obtain the actual weighted mean z values. Note that
-        when all weights are one, (or if w is set to 1 for shorthand), a standard
-        mean is calculated.
+        vgrid implemnets incremental gridding where possible.
+        To do this, the sum of the product of the weights and z values are
+        retained in addition to the sum of the weights. Then method zz()
+        calculates the quotient of the two to obtain the actual weighted
+        mean z values. Note that when all weights are one, (or if w is set to
+        1 for shorthand), a standard mean is calculated.
 
-        Variance is calcualted in a similar way. In this case the sum of w*(z_i - mu)^2
-        is calculated and stored for each grid node, where z_i is the value to be gridded
-        and mu is the mean of the grid node calculated thus far.  Then this sum 
-        is divided by the sum of the weights to get the final estimated variance. As the
-        mean of the grid node approaches the true mean, this value should approach the 
-        true variance. 
+        Variance is calcualted in a similar way. In this case the sum of
+        w*(z_i - mu)^2 is calculated and stored for each grid node, where
+        z_i is the value to be gridded and mu is the mean of the grid node
+        calculated thus far.  Then this sum is divided by the sum of the
+        weights to get the final estimated variance. As the mean of the grid
+        node approaches the true mean, this value should approach the true
+        variance.
         '''
-        
-        self._II = self._I[idx][jdx]
-        
+      
+        self._II = self._I[idx][jdx].ravel()
+
         # Non-weighted gridding.
         if self._w.size == 1:
             self.zw[idx, jdx] = np.nansum(np.concatenate((self._z[self._II], [self.zw[idx, jdx]])))
@@ -174,10 +179,10 @@ class vgrid():
             tmp = np.empty((self.yy.size,dx.size))
             tmp.fill(np.nan)
             # Tack it on.
-            self.zw = np.concatenate((np.copy(tmp), self.zw), axis=0)
-            self.nn = np.concatenate((np.copy(tmp), self.nn), axis=0)
-            self.ww = np.concatenate((np.copy(tmp), self.ww), axis=0)
-            self.varw = np.concatenate((np.copy(tmp), self.varw), axis=0)
+            self.zw = np.concatenate((np.copy(tmp), self.zw), axis=1)
+            self.nn = np.concatenate((np.copy(tmp), self.nn), axis=1)
+            self.ww = np.concatenate((np.copy(tmp), self.ww), axis=1)
+            self.varw = np.concatenate((np.copy(tmp), self.varw), axis=1)
 
         # FIX: Support depth/platelet estimates here, tbd
 
@@ -204,14 +209,14 @@ class vgrid():
             self.varw = np.concatenate((np.copy(tmp), self.varw),axis=0)
 
         if maxy > self.yy[-1]:
-            dy = np.arange(self.yy[-1]+self.cs,maxy,self.cs)
-            self.yy = np.concatenate((self.yy,dy))
-            tmp = np.empty((dy.size,self.xx.size))
+            dy = np.arange(self.yy[-1] + self.cs,maxy, self.cs)
+            self.yy = np.concatenate((self.yy, dy))
+            tmp = np.empty((dy.size, self.xx.size))
             tmp.fill(np.nan)
-            self.zw = np.concatenate((self.zw,np.copy(tmp)), axis=1)
-            self.nn = np.concatenate((self.nn,np.copy(tmp)), axis=1)
-            self.ww = np.concatenate((self.ww,np.copy(tmp)), axis=1)
-            self.varw = np.concatenate((self.varw,np.copy(tmp)), axis=1)
+            self.zw = np.concatenate((self.zw, np.copy(tmp)), axis=0)
+            self.nn = np.concatenate((self.nn, np.copy(tmp)), axis=0)
+            self.ww = np.concatenate((self.ww, np.copy(tmp)), axis=0)
+            self.varw = np.concatenate((self.varw, np.copy(tmp)), axis=0)
 
     def add(self, x, y, z, w):
         ''' An incremental gridding function
@@ -350,7 +355,7 @@ class vgrid():
         cinf2 = self.cinf**2
 
         # Go through the rows of the grid..
-        for idx in np.arange(0,self.yy.size, dtype='uint32'):
+        for idx in np.arange(0, self.yy.size, dtype='uint32'):
             '''
             We need to search through all the data efficiently to determine
             indices for points that will contribute to a grid node. Those that
