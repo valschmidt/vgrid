@@ -159,10 +159,10 @@ class vgrid():
             tmp = np.empty((self.yy.size,dx.size))
             tmp.fill(np.nan)
             # Tack it on.
-            self.zw = np.concatenate((np.copy(tmp), self.zw), axis=0)
-            self.nn = np.concatenate((np.copy(tmp), self.nn), axis=0)
-            self.ww = np.concatenate((np.copy(tmp), self.ww), axis=0)
-            self.varw = np.concatenate((np.copy(tmp), self.varw), axis=0)
+            self.zw = np.concatenate((np.copy(tmp), self.zw), axis=1)
+            self.nn = np.concatenate((np.copy(tmp), self.nn), axis=1)
+            self.ww = np.concatenate((np.copy(tmp), self.ww), axis=1)
+            self.varw = np.concatenate((np.copy(tmp), self.varw), axis=1)
 
         # FIX: Support depth/platelet estimates here, tbd
 
@@ -193,10 +193,10 @@ class vgrid():
             self.yy = np.concatenate((self.yy,dy))
             tmp = np.empty((dy.size,self.xx.size))
             tmp.fill(np.nan)
-            self.zw = np.concatenate((self.zw,np.copy(tmp)), axis=1)
-            self.nn = np.concatenate((self.nn,np.copy(tmp)), axis=1)
-            self.ww = np.concatenate((self.ww,np.copy(tmp)), axis=1)
-            self.varw = np.concatenate((self.varw,np.copy(tmp)), axis=1)
+            self.zw = np.concatenate((self.zw,np.copy(tmp)), axis=0)
+            self.nn = np.concatenate((self.nn,np.copy(tmp)), axis=0)
+            self.ww = np.concatenate((self.ww,np.copy(tmp)), axis=0)
+            self.varw = np.concatenate((self.varw,np.copy(tmp)), axis=0)
 
 
     def add(self, x, y, z, w):
