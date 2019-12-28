@@ -1,1 +1,1 @@
-# [docs/README.rst](vgrid - an incremental gridding algorithm.)
+# [./docs/README.rst](vgrid - an incremental gridding algorithm.)
