@@ -381,8 +381,8 @@ class vgrid():
 
         On my test dataset containing about 4.5 million soundings, I got the following results:
         - existing add = 55.8 seconds
-        - numba_add (chunksize, time) = (100, 59.4), (1000, 28.5), (10000, 25.2), (100000, 24.5), (150000, 40.3),
-                                        (200000, 40.1), (1000000, 42.8)
+        - numba_add (chunksize, time) = (100, 55.2), (1000, 21.2), (10000, 17.9), (100000, 16.6), (150000, 16.2),
+                                        (200000, 15.7), (1000000, 18.0)
         """
 
         # Force everything to match.
