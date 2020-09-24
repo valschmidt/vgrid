@@ -315,6 +315,7 @@ for idx = 1:grows
         continue
     end
     
+    xtest = cinf2 - ddy(yidx);
     for jdx = 1:gcols
         % Then go through each cell of that row, and look for x-values that
         % also are in the cell.
@@ -323,7 +324,7 @@ for idx = 1:grows
         %xidx = find( (x(yidx) - xx(jdx)).^2 < cinf2);
         % Same find statement reworked to support cl_memmapfile.
         %xidx = find( x(yidx) < g.xx(jdx) + g.cinf & x(yidx) > g.xx(jdx) - g.cinf);
-        xidx = find( (x(yidx) - g.xx(jdx)).^2 < cinf2 - ddy(yidx));
+        xidx = find( (x(yidx) - g.xx(jdx)).^2 < xtest);
         
         if isempty(xidx)
             continue
