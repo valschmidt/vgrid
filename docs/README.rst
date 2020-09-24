@@ -108,10 +108,5 @@ member variables.
 .. image:: output_5_9.png
 
 
-``vgrid`` is a work in progress. It is being ported from a MATLAB
-routine where it runs faster by at least a factor of two. Scipy KDTrees
-were experimented with but turned out to be slower by a factor of 10.
-Research is ongoing to speed things up.
-
-Not all gridding methods found under ``G.add()`` have been ported yet.
-
+``vgrid`` is being ported from a MATLAB routine and not all gridding
+methods found under ``G.add()`` have been ported yet.
