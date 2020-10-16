@@ -13,6 +13,7 @@
 import numpy as np
 from line_profiler import LineProfiler
 import sys
+import scipy.spatial as spatial
 
 class vgrid():
     ''' A class for gridding of x,y,z data.
@@ -86,8 +87,8 @@ class vgrid():
         node approaches the true mean, this value should approach the true
         variance.
         '''
-      
-        self._II = self._I[idx][jdx].ravel()
+
+        self._II = self._I[idx][jdx]
 
         # Non-weighted gridding.
         if self._w.size == 1:
@@ -327,7 +328,8 @@ class vgrid():
 
         doindices = 0
 
-        self.sort_data()
+        #self.sort_data()
+        self.sort_data_kdtree()
  
         # Peform the gridding calculations.        
         if self.type == 'dwm':
@@ -342,6 +344,17 @@ class vgrid():
 
         if self.type == "median":
             self.median_wholegrid()
+
+    def sort_data_kdtree(self):
+        ''' A sorting of the data into grid cells using KDtrees.'''
+
+        tree = spatial.cKDTree(list(zip(self._x.ravel(), self._y.ravel())), leafsize=1e7)
+        xxx,yyy = np.meshgrid(self.xx,self.yy)
+        indexes = tree.query_ball_point(np.vstack((xxx.ravel(), yyy.ravel())).T,
+                                        r=self.cinf,
+                                        p=2,
+                                        n_jobs=-1).reshape(xxx.shape)
+        self._I = indexes
 
     def sort_data(self):
         ''' Determine which data contributes to each grid node.
