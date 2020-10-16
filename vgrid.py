@@ -479,7 +479,10 @@ def _numba_add(xx, yy, nn, cinf, x, y, z, w, typ, zw, varw, ww):
             if typ == 'dwm':
                 # Calculate distance between points and grid node for distance-weighted mean.
                 # In the case, w is the exponent.
-                R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w[II] / 2.0)
+                if w.size != 1:
+                    R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w[II] / 2.0)
+                else:
+                    R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w / 2.0)
 
             if not doindices:
                 nn[idx, jdx] = np.nansum(np.array([nn[idx, jdx], xidx.size]))
