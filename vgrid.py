@@ -396,14 +396,13 @@ class vgrid():
         if not np.isscalar(w):
             self._w = w.ravel()
         else:
-            self._w = np.array(w)
+            self._w = np.full_like(self._x, w)
 
         # Weight cannot be zero.
-        if self._w.size != 1:
-            if sum(self._w == 0):
-                print("Found zero weights. Weights cannot be zero.")
-                print("Setting to 1e-20.")
-                self._w[self._w == 0] = 1e-20
+        if sum(self._w == 0):
+            print("Found zero weights. Weights cannot be zero.")
+            print("Setting to 1e-20.")
+            self._w[self._w == 0] = 1e-20
 
         # Set up new grid, or extend the existing grid if necessary.
         if self.zw is None:
@@ -416,10 +415,7 @@ class vgrid():
 
         for chnk in chnks:
             chnk_idx = slice(chnk[0], chnk[1])
-            if self._w.size != 1:
-                chunk_w = self._w[chnk_idx]
-            else:
-                chunk_w = self._w
+            chunk_w = self._w[chnk_idx]
             self.zw, self.ww, self.varw, self.nn = _numba_add(self.xx, self.yy, self.nn, self.cinf, self._x[chnk_idx],
                                                               self._y[chnk_idx], self._z[chnk_idx], chunk_w,
                                                               self.type, self.zw, self.varw, self.ww)
@@ -479,20 +475,15 @@ def _numba_add(xx, yy, nn, cinf, x, y, z, w, typ, zw, varw, ww):
             if typ == 'dwm':
                 # Calculate distance between points and grid node for distance-weighted mean.
                 # In the case, w is the exponent.
-                if w.size != 1:
-                    R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w[II] / 2.0)
-                else:
-                    R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w / 2.0)
+                R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w[II] / 2.0)
 
             if not doindices:
                 nn[idx, jdx] = np.nansum(np.array([nn[idx, jdx], xidx.size]))
             else:
                 nn[idx, jdx] = idx * (gcols - 1) + jdx
 
-            if w.size != 1:
-                chunk_w = w[II]
-            else:
-                chunk_w = w
+            chunk_w = w[II]
+
             if typ == 'mean':
                 zw[idx, jdx], ww[idx, jdx], varw[idx, jdx] = _numba_mean_by_cell(zw[idx, jdx], ww[idx, jdx],
                                                                                  varw[idx, jdx], nn[idx, jdx], z[II],
