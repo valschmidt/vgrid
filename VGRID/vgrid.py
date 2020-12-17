@@ -219,6 +219,7 @@ class vgrid():
             self.ww = np.concatenate((self.ww, np.copy(tmp)), axis=0)
             self.varw = np.concatenate((self.varw, np.copy(tmp)), axis=0)
 
+
     def add(self, x, y, z, w):
         ''' An incremental gridding function
 
