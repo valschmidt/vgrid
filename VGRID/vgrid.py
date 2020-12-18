@@ -14,6 +14,9 @@ import numpy as np
 from line_profiler import LineProfiler
 import sys
 import scipy.spatial as spatial
+from matplotlib import pyplot as plt
+import numba
+
 
 class vgrid():
     ''' A class for gridding of x,y,z data.
@@ -219,7 +222,6 @@ class vgrid():
             self.ww = np.concatenate((self.ww, np.copy(tmp)), axis=0)
             self.varw = np.concatenate((self.varw, np.copy(tmp)), axis=0)
 
-
     def add(self, x, y, z, w):
         ''' An incremental gridding function
 
@@ -320,7 +322,6 @@ class vgrid():
         # Set up new grid, or extend the existing grid if necessary.
         if self.zw is None:
             self.create_new_grid()
-
         else:
             self.expand_grid()
 
@@ -412,14 +413,61 @@ class vgrid():
                                                        xidx.size))
  
 
+    def numba_add(self, x, y, z, w, chnksize=100000):
+        """
+        An attempt at running self.add with numba.  Key here is to chunk the points so that the numba compiled function
+        _numba_add runs multiple times, where the first run is slow as it compiles.  _numba_add is not within the class,
+        as classes aren't supported.  There is this new thing numba.jitclass, but it appears to still be experimental.
+
+        On my test dataset containing about 4.5 million soundings, I got the following results:
+        - existing add = 55.8 seconds
+        - numba_add (chunksize, time) = (100, 55.2), (1000, 21.2), (10000, 17.9), (100000, 16.6), (150000, 16.2),
+                                        (200000, 15.7), (1000000, 18.0)
+        """
+
+        # Force everything to match.
+        if np.isscalar(x) or np.isscalar(y) or np.isscalar(z):
+            print('X, Y, or Z is scalar - must be numpy array.')
+            sys.exit()
+
+        self._x = x.ravel()
+        self._y = y.ravel()
+        self._z = z.ravel()
+        if not np.isscalar(w):
+            self._w = w.ravel()
+        else:
+            self._w = np.array(w)
+
+        # Weight cannot be zero.
+        if self._w.size != 1:
+            if sum(self._w == 0):
+                print("Found zero weights. Weights cannot be zero.")
+                print("Setting to 1e-20.")
+                self._w[self._w == 0] = 1e-20
+
+        # Set up new grid, or extend the existing grid if necessary.
+        if self.zw is None:
+            self.create_new_grid()
+        else:
+            self.expand_grid()
+
+        ptlen = len(self._x)
+        chnks = [[i * chnksize, min((i + 1) * chnksize, ptlen)] for i in range(int(ptlen / chnksize) + 1)]
+
+        for chnk in chnks:
+            chnk_idx = slice(chnk[0], chnk[1])
+            if self._w.size != 1:
+                chunk_w = self._w[chnk_idx]
+            else:
+                chunk_w = self._w
+            self.zw, self.ww, self.varw, self.nn = _numba_add(self.xx, self.yy, self.nn, self.cinf, self._x[chnk_idx],
+                                                              self._y[chnk_idx], self._z[chnk_idx], chunk_w,
+                                                              self.type, self.zw, self.varw, self.ww)
 
     def rotate(self):
         pass
 
     def pcolor(self,*kwargs):
-
-        from matplotlib import pyplot as plt
-
         plt.pcolor(self.xx,self.yy,self.zz(),*kwargs)
         #plt.colorbar()
         plt.ion()
@@ -428,9 +476,114 @@ class vgrid():
         plt.pause(0.001)
 
 
+@numba.jit(nopython=True, nogil=True, parallel=True)
+def _numba_add(xx, yy, nn, cinf, x, y, z, w, typ, zw, varw, ww):
+    """
+    numba jit compiled add function
+
+    - Numba compiles this function, ensure that no classes/functions are within unless they are also numba-ized
+    - Numba.prange forces numba to parallelize, generates exception when parallelism fails, helping you figure out
+        what needs to be fixed.  Otherwise parallel=True can fail silently
+    - nopython=True, this function operates entirely outside of the python interpreter
+    - nogil=True, will not use the python GIL (this might be redundant with nopython)
+
+    """
+    grows = yy.size
+    gcols = xx.size
+    doindices = 0
+    cinf2 = cinf ** 2
+
+    # Go through the rows of the grid..
+    for idx in numba.prange(grows):
+        # Here we find the y data values within cinf of the grid node
+        ddy = (y - yy[idx]) ** 2
+        yidx = np.flatnonzero(ddy < cinf2)
+
+        # If there are none, then don't bother with further calculations.
+        if yidx.size == 0:
+            continue
+
+        # Then go through each cell of that row, and look for x - values that also are in the cell.
+        # But first pre-calculate a vector of terms that will be needed for every evaluation.
+        xtest = cinf2 - ddy[yidx]
+        for jdx in numba.prange(gcols):
+            xidx = np.flatnonzero((x[yidx] - xx[jdx]) ** 2 < xtest)
+
+            # If there are none of these then there is nothing to do to the grid node.
+            if xidx.size == 0:
+                continue
+
+            # Set the indices of the values to be add to this grid node.
+            II = yidx[xidx]
+
+            if typ == 'dwm':
+                # Calculate distance between points and grid node for distance-weighted mean.
+                # In the case, w is the exponent.
+                if w.size != 1:
+                    R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w[II] / 2.0)
+                else:
+                    R = ((xx[jdx] - x[II]) ** 2 + (yy[idx] - y[II]) ** 2) ** (w / 2.0)
+
+            if not doindices:
+                nn[idx, jdx] = np.nansum(np.array([nn[idx, jdx], xidx.size]))
+            else:
+                nn[idx, jdx] = idx * (gcols - 1) + jdx
+
+            if w.size != 1:
+                chunk_w = w[II]
+            else:
+                chunk_w = w
+            if typ == 'mean':
+                zw[idx, jdx], ww[idx, jdx], varw[idx, jdx] = _numba_mean_by_cell(zw[idx, jdx], ww[idx, jdx],
+                                                                                 varw[idx, jdx], nn[idx, jdx], z[II],
+                                                                                 chunk_w)
+            elif typ == "median":
+                zw[idx, jdx], ww[idx, jdx], varw[idx, jdx] = _numba_median_by_cell(zw[idx, jdx], ww[idx, jdx],
+                                                                                   varw[idx, jdx], z[II])
+    return zw, ww, varw, nn
+
+
+@numba.jit(nopython=True)
+def _numba_mean_by_cell(zw_cell, ww_cell, varw_cell, nn_cell, z, w):
+    # Non-weighted gridding.
+    if w.size == 1:
+        zw = np.nansum(np.concatenate((z, np.array([zw_cell]))))
+        ww = nn_cell
+        varw = np.nansum(np.concatenate((((z - zw / nn_cell) ** 2), np.array([varw_cell]))))
+    else:
+        # Weighted gridding. Sum of value times the weight divided by the
+        # sum of the weights.
+        # The strategy taken here is to retain the sum of the values times the weights, and also
+        # the sum of the weights. Then when the weighted mean is requested the calling function
+        # divides the these two values. This strategy allows incremental addition of data to the grid.
+        #
+        # The coding strategy below is to append the new points to the existing point in a list
+        # and then call nansum to add them up.
+        #
+        # Q: Note: A dot-product might be quicker, but there is no dot-product that will produce a
+        # non-nan result if one of the values is nan, which is desired here.
+        zw = np.nansum(np.append(zw_cell, z * w))
+        ww = np.nansum(np.append(ww_cell, w))
+        varw = np.nansum(np.append(((z - zw_cell / ww_cell) ** 2), varw_cell))
+    return zw, ww, varw
+
+
+@numba.jit(nopython=True)
+def _numba_median_by_cell(zw_cell, ww_cell, varw_cell, z):
+    ''' Calculate the median value in each grid cell.
+
+    The method used here to provide a "running median" is for each add(),
+    calculate the average of the existing value with the median of the
+    new points. This method works reasonably well, but can produce
+    inferior results if a single add() contains only outliers and their
+    are insufficient additional adds to constrain it.'''
+    zw = np.nanmean(np.append(zw_cell, np.nanmedian(z)))
+    ww = 1
+    varw = np.nansum(np.append((z - zw_cell / ww_cell ** 2), varw_cell))
+    return zw, ww, varw
+
 
 if __name__=='__main__':
-
     profileON = True
 
     def gridTest(N = 2, ProfileON = False):
