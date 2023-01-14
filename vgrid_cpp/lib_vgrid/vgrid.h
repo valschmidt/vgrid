@@ -50,12 +50,13 @@ class vgrid
         
         // Utility Functions
         std::vector< double > arange(double start_val, double end_val, double increment);
-        vector <double> concatinate(vector <double> x1, vector <double> x2);
-        vector <vector <double>> concatinate2DUpDown(vector <vector <double>> upper, vector <vector <double>> lower);
-        vector <vector <double>> concatinate2DLeftRight(vector <vector <double>> left, vector <vector <double>> right);
+        vector <double> concatenate(vector <double> x1, vector <double> x2);
+        vector <vector <double>> concatenate2DUpDown(vector <vector <double>> upper, vector <vector <double>> lower);
+        vector <vector <double>> concatenate2DLeftRight(vector <vector <double>> left, vector <vector <double>> right);
         void printvector(string name, vector <double> v);
         void printintvector(string name, vector <int> v);
         void print2Dvector(string name, vector <vector <double>> v);
+        void printGridInfo();
 
     private:
 

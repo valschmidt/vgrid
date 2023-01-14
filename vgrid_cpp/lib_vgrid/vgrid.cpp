@@ -40,17 +40,19 @@ vector <double> vgrid::arange(double start_val, double end_val, double increment
     vector <double> result;
     double val;
     
-    /* In increment > 0, values return start at start value and end after end value is exceeded. If incement < 0, values start at end value and decrement until values are less than start_value. */
+    /* In increment > 0, values return start at start value and end after end 
+    value is exceeded. If increment < 0, values start at end value and decrement 
+    until values are less than start_value. */
     if (increment > 0.0) {
         val = start_val;
-        while (val <= (end_val + increment)){
+        while (val <= (end_val)){
             result.push_back(val);
             val += increment;
         }
     }
     else {
         val = end_val;
-        while (val > start_val + increment){
+        while (val > start_val){
             result.insert(result.begin(),val);
             val += increment;
         }
@@ -58,18 +60,18 @@ vector <double> vgrid::arange(double start_val, double end_val, double increment
     return result;
 }
 
-/* A utility funtion to return a concatination of 2 vectors */
-vector <double> vgrid::concatinate(vector <double> x1, vector <double> x2){
+/* A utility funtion to return a concatenation of 2 vectors */
+vector <double> vgrid::concatenate(vector <double> x1, vector <double> x2){
  
     vector <double> result(x1);
     result.insert(result.end(), x2.begin(), x2.end());
     return result;
 }
 
-vector <vector <double>> vgrid::concatinate2DUpDown(vector <vector <double>> upper, vector <vector <double>> lower){
+vector <vector <double>> vgrid::concatenate2DUpDown(vector <vector <double>> upper, vector <vector <double>> lower){
  
     if (upper[0].size() != lower[0].size()) {
-        cout << "ERROR attempted vertical concatination of 2D vectors having differing numbers of columns!\n";
+        cout << "ERROR attempted vertical concatenation of 2D vectors having differing numbers of columns!\n";
         exit(1);
     }
     vector <vector <double>> result(upper);
@@ -77,10 +79,10 @@ vector <vector <double>> vgrid::concatinate2DUpDown(vector <vector <double>> upp
     return result;
 }
 
-vector <vector <double>> vgrid::concatinate2DLeftRight(vector <vector <double>> left, vector <vector <double>> right){
+vector <vector <double>> vgrid::concatenate2DLeftRight(vector <vector <double>> left, vector <vector <double>> right){
  
     if (left.size() != right.size()) {
-        cout << "ERROR attempted horizontal concatiation of 2D vectors having differing numbers of rows.\n";
+        cout << "ERROR attempted horizontal concatenation of 2D vectors having differing numbers of rows.\n";
         exit(1);
     }
     vector <vector <double>> result(left);
@@ -106,8 +108,8 @@ void vgrid::create_grid(){
     
     // Create the extents of x and y.
     double val = min_x;
-    m_xx = arange(min_x, max_x, m_cs);
-    m_yy = arange(min_y, max_y, m_cs);
+    m_xx = arange(min_x - m_cinf, max_x + m_cinf, m_cs);
+    m_yy = arange(min_y - m_cinf, max_y + m_cinf, m_cs);
     /*while (val <= max_x + m_cs){
      m_xx.push_back(val);
      val += m_cs;
@@ -157,51 +159,51 @@ void vgrid::expand_grid(){
     // Expand to the west..
     if (min_x < m_xx[0]){
         gridextension = arange(min_x, m_xx.front() - m_cs, -m_cs);
-        m_xx = concatinate(gridextension, m_xx);
+        m_xx = concatenate(gridextension, m_xx);
 
         /* Expand grid...*/
         vector <vector <double>> tmp (m_zw.size(), vector <double> (gridextension.size(), NAN));
-        m_zw = concatinate2DLeftRight(tmp, m_zw);
-        m_ww = concatinate2DLeftRight(tmp, m_ww);
-        m_varw = concatinate2DLeftRight(tmp, m_varw);
-        m_nn = concatinate2DLeftRight(tmp, m_nn);
+        m_zw = concatenate2DLeftRight(tmp, m_zw);
+        m_ww = concatenate2DLeftRight(tmp, m_ww);
+        m_varw = concatenate2DLeftRight(tmp, m_varw);
+        m_nn = concatenate2DLeftRight(tmp, m_nn);
 
 
     }
     // Expand to the east...
     if (max_x > m_xx[m_xx.size()-1]) {
         gridextension = arange(m_xx.back() + m_cs, max_x, m_cs);
-        m_xx = concatinate(m_xx, gridextension);
+        m_xx = concatenate(m_xx, gridextension);
         /* Expand grid...*/
         vector <vector <double>> tmp (m_zw.size(), vector <double> (gridextension.size(), NAN));
-        m_zw = concatinate2DLeftRight(m_zw, tmp);
-        m_ww = concatinate2DLeftRight(m_ww, tmp);
-        m_varw = concatinate2DLeftRight(m_varw, tmp);
-        m_nn = concatinate2DLeftRight(m_nn, tmp);
+        m_zw = concatenate2DLeftRight(m_zw, tmp);
+        m_ww = concatenate2DLeftRight(m_ww, tmp);
+        m_varw = concatenate2DLeftRight(m_varw, tmp);
+        m_nn = concatenate2DLeftRight(m_nn, tmp);
 
     }
     // Expand to the south...
         if (min_y < m_yy[0]){
         gridextension = arange(min_y, m_yy.front() - m_cs, -m_cs);
-        m_yy = concatinate(gridextension, m_yy);
+        m_yy = concatenate(gridextension, m_yy);
         /* Expand grid here...*/
         vector <vector <double>> tmp (gridextension.size(), vector <double> (m_zw[0].size(), NAN));
-        m_zw = concatinate2DUpDown(m_zw,tmp);
-        m_ww = concatinate2DUpDown(m_ww,tmp);
-        m_varw = concatinate2DUpDown(m_varw,tmp);
-        m_nn = concatinate2DUpDown(m_nn,tmp);
+        m_zw = concatenate2DUpDown(m_zw,tmp);
+        m_ww = concatenate2DUpDown(m_ww,tmp);
+        m_varw = concatenate2DUpDown(m_varw,tmp);
+        m_nn = concatenate2DUpDown(m_nn,tmp);
 
     }
     // Expand to the north...
     if (max_y > m_yy[m_yy.size()-1]) {
         gridextension = arange(m_yy.back() + m_cs, max_y, m_cs);
-        m_yy = concatinate(m_yy, gridextension);
+        m_yy = concatenate(m_yy, gridextension);
         //printvector("m_yy",m_yy);
         vector <vector <double>> tmp (gridextension.size(), vector <double> (m_zw[0].size(), NAN));
-        m_zw = concatinate2DUpDown(tmp,m_zw);
-        m_ww = concatinate2DUpDown(tmp,m_ww);
-        m_varw = concatinate2DUpDown(tmp,m_varw);
-        m_nn = concatinate2DUpDown(tmp,m_nn);
+        m_zw = concatenate2DUpDown(tmp,m_zw);
+        m_ww = concatenate2DUpDown(tmp,m_ww);
+        m_varw = concatenate2DUpDown(tmp,m_varw);
+        m_nn = concatenate2DUpDown(tmp,m_nn);
 
 
     }
@@ -243,6 +245,17 @@ void vgrid::print2Dvector(string name, vector <vector <double>> v){
     }
 }
 
+void vgrid::printGridInfo(){
+    /*"Print basic info about the grid."*/
+
+    cout << "Grid Info:" << "\n";
+    cout << "  Grid Cell Size: " << m_cs << "\n";
+    cout << "  Grid Cell Influence:" << m_cinf << "\n";
+    cout << "  Grid Size: " << m_grows << "x" << m_gcols << "\n";
+    cout << "  Type: " << m_gridtype << "\n";
+    cout << "  Grid Bounds: X: " << m_xx[0] << "-" << m_xx[m_xx.size()-1] 
+                        << "\tY: " << m_yy[0] << "-" << m_yy[m_yy.size()-1] << "\n"; 
+}
 
 void vgrid::add(vector <double> x, vector <double> y, vector <double> z, vector <double> w){
 

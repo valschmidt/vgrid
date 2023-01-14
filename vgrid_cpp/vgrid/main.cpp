@@ -39,16 +39,21 @@ int main(int argc, char **argv) {
     vector <double> z;
     vector <double> w;
     
+    cout << "X\tY\tZ" << "\n";
+    cout << "---------" << "\n";
+
     int i = 0;
     for (i=0; i < N; i++){
      x.push_back(double(i));
      y.push_back(double(i));
-     z.push_back(double(i));
+     //z.push_back(double(i));
+     z.push_back(1.0);
      w.push_back(1);
+    cout << x[x.size()-1] << "\t" << y[y.size()-1] << "\t" << z[z.size()-1] << "\n"; 
     }
     
     //vgrid G = vgrid(1.0,1.0,"mean");
-    vgrid G = vgrid(1.0,3.0,"mean");
+    vgrid G = vgrid(1.0,2.0,"mean");
     G.m_verbose = 1;
     G.add(x,y,z,w);
 	G.hello_world();
@@ -57,6 +62,8 @@ int main(int argc, char **argv) {
     vector <double> z2 = {0};
     vector <double> w2 = {0};
     G.add(x2,y2,z2,w2);*/
+    G.printGridInfo();
+    G.print2Dvector("nn",G.m_nn);
     G.print2Dvector("ww",G.m_ww);
     G.print2Dvector("zw",G.m_zw);
     G.print2Dvector("zz",G.zz());
