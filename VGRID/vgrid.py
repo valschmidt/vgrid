@@ -355,7 +355,7 @@ class vgrid():
         indexes = tree.query_ball_point(np.vstack((xxx.ravel(), yyy.ravel())).T,
                                         r=self.cinf,
                                         p=2,
-                                        n_jobs=-1).reshape(xxx.shape)
+                                        workers=-1).reshape(xxx.shape)
         self._I = indexes
 
     def sort_data(self):
