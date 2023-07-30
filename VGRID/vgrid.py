@@ -11,7 +11,7 @@
 
 
 import numpy as np
-from line_profiler import LineProfiler
+#from line_profiler import LineProfiler
 import sys
 import scipy.spatial as spatial
 from matplotlib import pyplot as plt

@@ -5,11 +5,13 @@ setup(
     name = "vgrid",
     version = "1.0.0",
     license = "BSD 2-Clause License",
-    packages = find_packages(),
+    packages = find_packages(
+	where="VGRID"),
     python_requires=">=3.0",
     install_requires=[
         "numpy",
         "scipy",
+        "numba"
     ],
     description="Module for incremental gridding of XYZ data.",
     classifiers=[
