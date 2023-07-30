@@ -330,8 +330,8 @@ class vgrid():
 
         doindices = 0
 
-        #self.sort_data()
-        self.sort_data_kdtree()
+        self.sort_data()
+        #self.sort_data_kdtree()
  
         # Peform the gridding calculations.        
         if self.type == 'dwm':
