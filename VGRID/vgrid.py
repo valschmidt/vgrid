@@ -72,6 +72,14 @@ class vgrid():
          for jdx in range(self.xx.size)
          if self._I[idx][jdx] is not None]
 
+    def meanwoutlier_wholegrid(self,Nsigma):
+        ''' Calculate mean values for the whole grid.'''
+        # Fancy list comprehension to execute a double loop concisely.
+        [self.meanwithoutlierrejection(idx, jdx, Nsigma)
+         for idx in range(self.yy.size)
+         for jdx in range(self.xx.size)
+         if self._I[idx][jdx] is not None]
+
     def mean(self, idx, jdx):
         '''Mean gridding algorithm.
 
@@ -123,10 +131,45 @@ class vgrid():
         '''Calculate the standard deviation'''
         return np.sqrt(self.var())
 
-    def meanwithoutlierrejection(self):
-        ''' TO DO: Calculate the mean, rejecting values that exceed 3-sigma
+    def meanwithoutlierrejection(self, idx, jdx, Nsigma):
+        ''' EXPERIMENTAL: Calculate the mean, rejecting values that exceed N-sigma
         from existing estimate.'''
-        pass
+
+        self._II = self._I[idx][jdx]
+
+        # Create a boolean mask for each new candidate depth value to be considered for the
+        # node testing whether the difference from the existing estimate is less than Nsigma
+        # Then omit those indices from the list.
+        # Calculate abs(z_i - z_mu) < Nsigma * sqrt(sigma_z)
+        if not np.isnan(self.zw[idx][jdx]):
+            mask = np.abs(self.zw[idx][jdx]/self.ww[idx][jdx] - self._z[self._II]) < Nsigma*np.sqrt(self.varw[idx,jdx]/self.zw[idx][jdx])
+            print(mask)
+            self._II = self._II[mask]
+
+        # Non-weighted gridding.
+        if self._w.size == 1:
+            self.zw[idx, jdx] = np.nansum(np.concatenate((self._z[self._II], [self.zw[idx, jdx]])))
+            self.nn[idx, jdx] = np.nansum(np.append(self.nn[idx, jdx],self._II.size))
+            self.ww[idx, jdx] = self.nn[idx, jdx]
+            self.varw[idx, jdx] = np.nansum(np.concatenate((np.power( (self._z[self._II] - self.zw[idx,jdx]/self.nn[idx,jdx]), 2),[self.varw[idx, jdx]])))
+        else:
+            # Weighted gridding. Sum of value times the weight divided by the 
+            # sum of the weights.
+            # The strategy taken here is to retain the sum of the values times the weights, and also
+            # the sum of the weights. Then when the weighted mean is requested the calling function 
+            # divides the these two values. This strategy allows incremental addition of data to the grid.
+            #
+            # The coding strategy below is to append the new points to the existing point in a list
+            # and then call nansum to add them up. 
+            #
+            # Q: Note: A dot-product might be quicker, but there is no dot-product that will produce a
+            # non-nan result if one of the values is nan, which is desired here.
+            self.zw[idx, jdx] = np.nansum(np.append(self.zw[idx, jdx], self._z[self._II] * self._w[self._II]))
+            self.nn[idx, jdx] = np.nansum(np.append(self.nn[idx, jdx],self._II.size))
+            self.ww[idx, jdx] = np.nansum(np.append(self.ww[idx, jdx], self._w[self._II]))
+            self.varw[idx, jdx] = np.nansum(np.append(np.power( (self._z[self._II] - self.zw[idx,jdx]/self.ww[idx,jdx]),2)
+                                                      , self.varw[idx, jdx] ))
+        
 
     def median(self, idx, jdx):
         ''' Calculate the median value in each grid cell.
@@ -347,6 +390,9 @@ class vgrid():
         if self.type == "median":
             self.median_wholegrid()
 
+        if self.type == "meanwithoutlierrejection":
+            self.meanwoutlier_wholegrid(Nsigma=3)
+
     def sort_data_kdtree(self):
         ''' A sorting of the data into grid cells using KDtrees.'''
 
@@ -408,8 +454,11 @@ class vgrid():
                 # Retain the list of indices contributing to the node.
                 self._I[idx][jdx] = yidx[xidx]
 
-                # Keep  running count of the number of values.
-                self.nn[idx,jdx] = np.nansum(np.append(self.nn[idx, jdx], 
+                if self.type != "meanwithoutlierrejection":
+                    # Keep  running count of the number of values.
+                    # If we are doing outlier rejection we have to track this 
+                    # when we do the rejecting.
+                    self.nn[idx,jdx] = np.nansum(np.append(self.nn[idx, jdx], 
                                                        xidx.size))
  
 
